@@ -4,7 +4,8 @@ name: android_release
 #   push:
 #     tags:
 #       - 'v*'
-
+on:
+  workflow_dispatch:
 jobs:
   android-arm64:
     runs-on: ubuntu-latest
