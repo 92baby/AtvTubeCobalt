@@ -67,6 +67,14 @@ jobs:
         run: |
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm64_gold cobalt_install
+
+      - name: Upload ARM64 APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobalt-android-arm64
+          path: out/android-arm64_gold/cobalt.apk
+          retention-days: 7
+        
       - name: Upload APK to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -136,6 +144,14 @@ jobs:
         run: |
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm_gold cobalt_install
+
+      - name: Upload ARM APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobalt-android-arm
+          path: out/android-arm_gold/cobalt.apk
+          retention-days: 7
+          
       - name: Upload APK to release
         uses: svenstaro/upload-release-action@v2
         with:
