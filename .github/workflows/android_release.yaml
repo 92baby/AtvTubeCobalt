@@ -75,14 +75,14 @@ jobs:
           path: out/android-arm64_gold/cobalt.apk
           retention-days: 7
         
-      - name: Upload APK to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: out/android-arm64_gold/cobalt.apk
-          asset_name: cobalt-android-arm64.apk
-          tag: v1.0.8
-          overwrite: true
+      #- name: Upload APK to release
+      #  uses: svenstaro/upload-release-action@v2
+      #  with:
+      #    repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #    file: out/android-arm64_gold/cobalt.apk
+      #    asset_name: cobalt-android-arm64.apk
+      #    tag: v1.0.8
+      #    overwrite: true
 
   android-arm:
     runs-on: ubuntu-latest
@@ -152,11 +152,11 @@ jobs:
           path: out/android-arm_gold/cobalt.apk
           retention-days: 7
           
-      - name: Upload APK to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: out/android-arm_gold/cobalt.apk
-          asset_name: cobalt-android-arm.apk
-          tag: v1.0.8
-          overwrite: true
+      #- name: Upload APK to release
+      #  uses: svenstaro/upload-release-action@v2
+      #  with:
+      #    repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #    file: out/android-arm_gold/cobalt.apk
+      #    asset_name: cobalt-android-arm.apk
+      #    tag: v1.0.8
+      #    overwrite: true
