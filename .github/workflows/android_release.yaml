@@ -73,7 +73,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: out/android-arm64_gold/cobalt.apk
           asset_name: cobalt-android-arm64.apk
-          tag: ${{ github.ref_name }}
+          tag: v1.0.8
           overwrite: true
 
   android-arm:
@@ -142,5 +142,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: out/android-arm_gold/cobalt.apk
           asset_name: cobalt-android-arm.apk
-          tag: ${{ github.ref_name }}
+          tag: v1.0.8
           overwrite: true
