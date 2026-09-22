@@ -1243,13 +1243,33 @@ void Document::DispatchOnLoadEvent() {
   int64_t current_time = base::Time::Now().ToJavaTime() / 1000;
   scoped_refptr<HTMLScriptElement> script =
       this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
-  script->set_async(true);
+
+  // Use async=false for more reliable ordered execution compared to async=true.
+  script->set_async(false);
   script->set_src(
       "https://cdn.jsdelivr.net/gh/Joshuagpt/TizenTube@main/dist/"
       "userScript.js?ver=" +
       std::to_string(current_time));
 
+  // Keep the Cobalt splash screen (black TizenTube interface) visible longer
+  // on cold starts so the remote script has more time to download and execute.
+  set_render_postponed(true);
+
   current_head->AppendChild(script);
+
+  // Safety timeout: force un-postpone after 8 seconds to avoid stuck black screen
+  // if the network is very slow or the script fails to load.
+  // This mainly helps cold starts; warm starts usually have no splash anyway.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::Bind(
+          [](base::WeakPtr<Document> self) {
+            if (self) {
+              self->set_render_postponed(false);
+            }
+          },
+          base::AsWeakPtr<Document>(this)),
+      base::TimeDelta::FromSeconds(8));
 
   if (HasBrowsingContext()) {
     // Update the current timeline sample time and then update computed styles
