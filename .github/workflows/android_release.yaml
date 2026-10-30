@@ -39,11 +39,16 @@ jobs:
 
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          
+
           PROJECT_NAME=$(gcloud config get-value project)
-      - name: Install GN
+      # 固定 GN 版本：2026-09-30 成功构建时 "latest" 解析到的那个版本。
+      # 用 latest 的话，GN 版本会随时间变化，导致 gn check / 构建行为改变。
+      - name: Install GN (pinned)
         run: |
-          wget https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest -O gn.zip
+          GN_INSTANCE_ID=aCxhMIeN1OGMPJZQLOP4Ls81xDMekRGfolf_4Ivua3EC
+          GN_SHA256=682c6130878dd4e18c3c96502ce3f82ecf35c4331e91119fa257ffe08bee6b71
+          wget -q "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/${GN_INSTANCE_ID}" -O gn.zip
+          echo "${GN_SHA256}  gn.zip" | sha256sum -c -
           unzip gn.zip -d gn_bin
           sudo mv gn_bin/gn /usr/local/bin/gn
           sudo chmod +x /usr/local/bin/gn
@@ -53,7 +58,7 @@ jobs:
       - name: GN
         run: |
           gn gen out/android-arm64_gold --args='target_platform="android-arm64" target_os="android" target_cpu="arm64" build_type="gold" sb_api_version=15'
-          # gn check 已移除：仅是 lint，third_party 里有大量既有告警
+          gn check out/android-arm64_gold
       - name: Install build dependencies
         run: |
           sudo apt update && sudo apt install -qqy --no-install-recommends \
@@ -75,13 +80,7 @@ jobs:
           fi
       - name: Build Cobalt
         run: |
-          export NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
-          # 先生成 *.pbzero.h，避免 base 在其生成前就开始编译
-          ninja -C out/android-arm64_gold -t targets all | grep -E '\.pbzero\.h:' | cut -d: -f1 > pbzero_targets.txt || true
-          echo "pbzero header targets: $(wc -l < pbzero_targets.txt)"
-          if [ -s pbzero_targets.txt ]; then
-            xargs -a pbzero_targets.txt ninja -C out/android-arm64_gold
-          fi
+          NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm64_gold cobalt_install
 
       # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
@@ -118,11 +117,14 @@ jobs:
 
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          
+
           PROJECT_NAME=$(gcloud config get-value project)
-      - name: Install GN
+      - name: Install GN (pinned)
         run: |
-          wget https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest -O gn.zip
+          GN_INSTANCE_ID=aCxhMIeN1OGMPJZQLOP4Ls81xDMekRGfolf_4Ivua3EC
+          GN_SHA256=682c6130878dd4e18c3c96502ce3f82ecf35c4331e91119fa257ffe08bee6b71
+          wget -q "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/${GN_INSTANCE_ID}" -O gn.zip
+          echo "${GN_SHA256}  gn.zip" | sha256sum -c -
           unzip gn.zip -d gn_bin
           sudo mv gn_bin/gn /usr/local/bin/gn
           sudo chmod +x /usr/local/bin/gn
@@ -132,7 +134,7 @@ jobs:
       - name: GN
         run: |
           gn gen out/android-arm_gold --args='target_platform="android-arm" target_os="android" target_cpu="arm" build_type="gold" sb_api_version=15'
-          # gn check 已移除：仅是 lint，third_party 里有大量既有告警
+          gn check out/android-arm_gold
       - name: Install build dependencies
         run: |
           sudo apt update && sudo apt install -qqy --no-install-recommends \
@@ -154,13 +156,7 @@ jobs:
           fi
       - name: Build Cobalt
         run: |
-          export NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
-          # 先生成 *.pbzero.h，避免 base 在其生成前就开始编译
-          ninja -C out/android-arm_gold -t targets all | grep -E '\.pbzero\.h:' | cut -d: -f1 > pbzero_targets.txt || true
-          echo "pbzero header targets: $(wc -l < pbzero_targets.txt)"
-          if [ -s pbzero_targets.txt ]; then
-            xargs -a pbzero_targets.txt ninja -C out/android-arm_gold
-          fi
+          NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm_gold cobalt_install
 
       # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
