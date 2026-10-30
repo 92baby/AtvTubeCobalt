@@ -6,15 +6,6 @@ name: android_release
 #       - 'v*'
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g. v1.0.9)，不存在会自动创建'
-        required: true
-        type: string
-
-permissions:
-  contents: write
-
 jobs:
   android-arm64:
     runs-on: ubuntu-latest
@@ -77,16 +68,21 @@ jobs:
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm64_gold cobalt_install
 
-      # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
-      - name: Rename APK
-        run: cp out/android-arm64_gold/cobalt.apk cobalt-android-arm64.apk
-
       - name: Upload ARM64 APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: cobalt-android-arm64
-          path: cobalt-android-arm64.apk
+          path: out/android-arm64_gold/cobalt.apk
           retention-days: 7
+        
+      #- name: Upload APK to release
+      #  uses: svenstaro/upload-release-action@v2
+      #  with:
+      #    repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #    file: out/android-arm64_gold/cobalt.apk
+      #    asset_name: cobalt-android-arm64.apk
+      #    tag: v1.0.8
+      #    overwrite: true
 
   android-arm:
     runs-on: ubuntu-latest
@@ -149,38 +145,18 @@ jobs:
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
           ninja -C out/android-arm_gold cobalt_install
 
-      # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
-      - name: Rename APK
-        run: cp out/android-arm_gold/cobalt.apk cobalt-android-arm.apk
-
       - name: Upload ARM APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: cobalt-android-arm
-          path: cobalt-android-arm.apk
+          path: out/android-arm_gold/cobalt.apk
           retention-days: 7
-
-  # 新增：两个架构都构建成功后，统一发布到 Release
-  release:
-    needs: [android-arm64, android-arm]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all APKs
-        uses: actions/download-artifact@v4
-        with:
-          pattern: cobalt-android-*
-          path: artifacts
-          merge-multiple: true
-
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag }}
-          # tag 不存在时，在触发 workflow 的这个提交上自动创建
-          target_commitish: ${{ github.sha }}
-          name: ${{ inputs.tag }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: artifacts/*.apk
+          
+      #- name: Upload APK to release
+      #  uses: svenstaro/upload-release-action@v2
+      #  with:
+      #    repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #    file: out/android-arm_gold/cobalt.apk
+      #    asset_name: cobalt-android-arm.apk
+      #    tag: v1.0.8
+      #    overwrite: true
