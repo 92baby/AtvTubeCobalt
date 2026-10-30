@@ -1,5 +1,9 @@
 name: android_release
 
+# on:
+#   push:
+#     tags:
+#       - 'v*'
 on:
   workflow_dispatch:
     inputs:
@@ -7,38 +11,25 @@ on:
         description: 'Release tag (e.g. v1.0.9)，不存在会自动创建'
         required: true
         type: string
-      prerelease:
-        description: '标记为预发布版本'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: build-${{ matrix.arch }}
+  android-arm64:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [arm64, arm]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           key: gradle-cache-${{ hashFiles('starboard/android/apk/**/*gradle*') }}
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-
+            /root/.gradle/caches
+            /root/.gradle/wrapper
       - name: Set up Cloud SDK
         uses: isarkis/setup-gcloud@40dce7857b354839efac498d3632050f568090b6
-
       - name: Set Android env vars
         run: |
           export ANDROID_HOME="$GITHUB_WORKSPACE/Android"
@@ -50,22 +41,24 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
           PROJECT_NAME=$(gcloud config get-value project)
-
-      - name: Install GN
+      # 固定 GN 版本：2026-09-30 成功构建时 "latest" 解析到的那个版本。
+      # 用 latest 的话，GN 版本会随时间变化，导致 gn check / 构建行为改变。
+      - name: Install GN (pinned)
         run: |
-          wget https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest -O gn.zip
+          GN_INSTANCE_ID=aCxhMIeN1OGMPJZQLOP4Ls81xDMekRGfolf_4Ivua3EC
+          GN_SHA256=682c6130878dd4e18c3c96502ce3f82ecf35c4331e91119fa257ffe08bee6b71
+          wget -q "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/${GN_INSTANCE_ID}" -O gn.zip
+          echo "${GN_SHA256}  gn.zip" | sha256sum -c -
           unzip gn.zip -d gn_bin
           sudo mv gn_bin/gn /usr/local/bin/gn
           sudo chmod +x /usr/local/bin/gn
-
+          gn --version
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$GITHUB_WORKSPACE:$PYTHONPATH" >> $GITHUB_ENV
-
       - name: GN
         run: |
-          gn gen out/android-${{ matrix.arch }}_gold --args='target_platform="android-${{ matrix.arch }}" target_os="android" target_cpu="${{ matrix.arch }}" build_type="gold" sb_api_version=15'
-          # gn check 会因上游 third_party 的头文件依赖问题报错，仅是 lint，不影响编译，已移除
-
+          gn gen out/android-arm64_gold --args='target_platform="android-arm64" target_os="android" target_cpu="arm64" build_type="gold" sb_api_version=15'
+          gn check out/android-arm64_gold
       - name: Install build dependencies
         run: |
           sudo apt update && sudo apt install -qqy --no-install-recommends \
@@ -76,7 +69,6 @@ jobs:
           ccache --max-size=20G
           bash ./starboard/tools/download_clang.sh
           bash ./starboard/android/shared/download_sdk.sh
-
       - name: Ensure Android debug keystore exists
         run: |
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
@@ -86,27 +78,101 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-
       - name: Build Cobalt
         run: |
           NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
-          ninja -C out/android-${{ matrix.arch }}_gold cobalt_install
+          ninja -C out/android-arm64_gold cobalt_install
 
-      # 两个架构产物都叫 cobalt.apk，重命名避免在 Release 里互相覆盖
+      # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
       - name: Rename APK
-        run: cp out/android-${{ matrix.arch }}_gold/cobalt.apk cobalt-android-${{ matrix.arch }}.apk
+        run: cp out/android-arm64_gold/cobalt.apk cobalt-android-arm64.apk
 
-      - name: Upload APK artifact
+      - name: Upload ARM64 APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cobalt-android-${{ matrix.arch }}
-          path: cobalt-android-${{ matrix.arch }}.apk
+          name: cobalt-android-arm64
+          path: cobalt-android-arm64.apk
           retention-days: 7
-          if-no-files-found: error
 
+  android-arm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          key: gradle-cache-${{ hashFiles('starboard/android/apk/**/*gradle*') }}
+          path: |
+            /root/.gradle/caches
+            /root/.gradle/wrapper
+      - name: Set up Cloud SDK
+        uses: isarkis/setup-gcloud@40dce7857b354839efac498d3632050f568090b6
+      - name: Set Android env vars
+        run: |
+          export ANDROID_HOME="$GITHUB_WORKSPACE/Android"
+          mkdir -p "$ANDROID_HOME"
+
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+
+          PROJECT_NAME=$(gcloud config get-value project)
+      - name: Install GN (pinned)
+        run: |
+          GN_INSTANCE_ID=aCxhMIeN1OGMPJZQLOP4Ls81xDMekRGfolf_4Ivua3EC
+          GN_SHA256=682c6130878dd4e18c3c96502ce3f82ecf35c4331e91119fa257ffe08bee6b71
+          wget -q "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/${GN_INSTANCE_ID}" -O gn.zip
+          echo "${GN_SHA256}  gn.zip" | sha256sum -c -
+          unzip gn.zip -d gn_bin
+          sudo mv gn_bin/gn /usr/local/bin/gn
+          sudo chmod +x /usr/local/bin/gn
+          gn --version
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE:$PYTHONPATH" >> $GITHUB_ENV
+      - name: GN
+        run: |
+          gn gen out/android-arm_gold --args='target_platform="android-arm" target_os="android" target_cpu="arm" build_type="gold" sb_api_version=15'
+          gn check out/android-arm_gold
+      - name: Install build dependencies
+        run: |
+          sudo apt update && sudo apt install -qqy --no-install-recommends \
+            bison clang libasound2-dev libgles2-mesa-dev libglib2.0-dev \
+            libxcomposite-dev libxi-dev libxrender-dev nasm ninja-build \
+            python3-venv ccache gcc-multilib \
+            g++-multilib libc6-dev-i386
+          ccache --max-size=20G
+          bash ./starboard/tools/download_clang.sh
+          bash ./starboard/android/shared/download_sdk.sh
+      - name: Ensure Android debug keystore exists
+        run: |
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            mkdir -p "$HOME/.android"
+            keytool -genkey -v -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - name: Build Cobalt
+        run: |
+          NINJA_STATUS="[%e sec | %f/%t %u remaining | %c/sec | j%r] "
+          ninja -C out/android-arm_gold cobalt_install
+
+      # 新增：重命名，避免两个架构的 cobalt.apk 在 Release 里重名
+      - name: Rename APK
+        run: cp out/android-arm_gold/cobalt.apk cobalt-android-arm.apk
+
+      - name: Upload ARM APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobalt-android-arm
+          path: cobalt-android-arm.apk
+          retention-days: 7
+
+  # 新增：两个架构都构建成功后，统一发布到 Release
   release:
-    name: publish-release
-    needs: build
+    needs: [android-arm64, android-arm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,9 +184,6 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List files
-        run: ls -lh artifacts
-
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
@@ -128,7 +191,6 @@ jobs:
           # tag 不存在时，在触发 workflow 的这个提交上自动创建
           target_commitish: ${{ github.sha }}
           name: ${{ inputs.tag }}
-          prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: artifacts/*.apk
