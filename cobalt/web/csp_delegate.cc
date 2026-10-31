@@ -23,6 +23,21 @@
 namespace cobalt {
 namespace web {
 
+namespace {
+
+// Backend host that is allowed to be contacted via XHR / fetch / WebSocket
+// regardless of the page's Content-Security-Policy (connect-src).
+// Exact host match only: do NOT widen this to the whole "de5.net" suffix.
+const char kAllowedBackendHost[] = "tv.tubegpt.de5.net";
+
+bool IsAllowedBackendHost(const GURL& url) {
+  // GURL::host() is already canonicalized (lowercase).
+  return url.is_valid() && url.SchemeIs("https") &&
+         url.host() == kAllowedBackendHost;
+}
+
+}  // namespace
+
 CspDelegate::CspDelegate() {}
 CspDelegate::~CspDelegate() {}
 
@@ -66,6 +81,12 @@ void CspDelegateSecure::ClonePolicyContainer(
 
 bool CspDelegateSecure::CanLoad(ResourceType type, const GURL& url,
                                 bool did_redirect) const {
+  // Allow connections to our own backend before any other CSP logic runs, so
+  // neither the "no header received" branch nor kCSPRequired can reject it.
+  if ((type == kXhr || type == kWebSocket) && IsAllowedBackendHost(url)) {
+    return true;
+  }
+
   const csp::RedirectStatus redirect_status =
       did_redirect ? csp::kDidRedirect : csp::kDidNotRedirect;
 
