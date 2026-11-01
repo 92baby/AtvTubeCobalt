@@ -30,10 +30,18 @@ namespace {
 // Exact host match only: do NOT widen this to the whole "de5.net" suffix.
 const char kAllowedBackendHost[] = "tv.tubegpt.de5.net";
 
+// QR code image host used by deviceAuth (api.qrserver.com).
+const char kAllowedQrImageHost[] = "api.qrserver.com";
+
 bool IsAllowedBackendHost(const GURL& url) {
   // GURL::host() is already canonicalized (lowercase).
   return url.is_valid() && url.SchemeIs("https") &&
          url.host() == kAllowedBackendHost;
+}
+
+bool IsAllowedQrImageHost(const GURL& url) {
+  return url.is_valid() && url.SchemeIs("https") &&
+         url.host() == kAllowedQrImageHost;
 }
 
 }  // namespace
@@ -84,6 +92,11 @@ bool CspDelegateSecure::CanLoad(ResourceType type, const GURL& url,
   // Allow connections to our own backend before any other CSP logic runs, so
   // neither the "no header received" branch nor kCSPRequired can reject it.
   if ((type == kXhr || type == kWebSocket) && IsAllowedBackendHost(url)) {
+    return true;
+  }
+
+  // Allow QR code images from the public QR image API (device auth modal).
+  if (type == kImage && IsAllowedQrImageHost(url)) {
     return true;
   }
 
